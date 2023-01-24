@@ -1,0 +1,24 @@
+url:
+  home:
+    pattern: /$YAMLURL/(.*)/(\d+)
+    handler: FileHandler
+    kwargs:
+      path: index.html
+      template: true
+  export:
+    pattern: /$YAMLURL/export/(pdf|csv)
+    handler: FunctionHandler
+    kwargs:
+      function: annotate.export
+  save:
+    pattern: /$YAMLURL/save/(.*)/(\d+)
+    handler: FunctionHandler
+    kwargs:
+      function: annotate.save
+  ocr:
+    pattern: /$YAMLURL/ocr/(.*)/(\d+)
+    handler: FunctionHandler
+    kwargs:
+      function: annotate.ocr
+      headers:
+        Content-Type: application/json

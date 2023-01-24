@@ -1,0 +1,9 @@
+textarea, input {
+  position: absolute;
+  z-index: 3;
+  font-size: 0.8rem!important
+}
+svg {
+  position: absolute;
+  z-index: 2
+}

@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+  {% set filename, page = handler.path_args %}
+  {% set page = int(page) %}
+  {% set zoom = handler.get_argument('zoom', 1) %}
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  <title>PDF Annotations</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-GLhlTQ8iRABdZLl6O3oVMWSktQOp6b7In1Zl3/Jr59b6EGGoI1aFkw7cmDA6j6gD" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.2.146/web/pdf_viewer.min.css">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="container-fluid justify-content-center pt-2">
+    <div class="row d-flex justify-content-center">
+      <div class="col-sm"><a href="/{{ filename }}/{{ page - 1 }}?zoom={{ zoom }}"
+          id="prev" class="btn btn-primary">Previous</a></div>
+      <div class="col-sm"><a href="/export/pdf?file={{ filename }}"
+          id="pdf" class="export btn btn-primary">Export PDF</a></div>
+      <div class="col-sm"><a href="/export/csv?file={{ filename }}"
+          id="csv" class="export btn btn-primary">Export CSV</a></div>
+      <div class="col-sm"><a href="/{{ filename }}/{{ page + 1 }}?zoom={{ zoom }}"
+          id="next" class="btn btn-primary">Next</a></div>
+    </div>
+    <div class="row pt-3 d-flex justify-content-center">
+    <canvas class="border border-primary border-primary"></canvas></div>
+  </div>
+</body>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js" integrity="sha384-w76AqPfDkMBDXo30jS1Sgez6pr3x5MlQ1ZAGC+nuZB+EYdgRZgiwxhTBTkF7CXvN" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.2.146/build/pdf.min.js"></script>
+<script >
+  const SCALE = {{ zoom }}
+  var BOXES = []
+  var svg = null
+  function renderPage(page) {
+    var viewport = page.getViewport({ scale: SCALE, });
+    // Support HiDPI-screens.
+    var outputScale = window.devicePixelRatio || 1;
+
+    var canvas = document.querySelector('canvas');
+    var context = canvas.getContext('2d');
+
+    canvas.width = Math.floor(viewport.width * outputScale);
+    canvas.height = Math.floor(viewport.height * outputScale);
+    canvas.style.width = Math.floor(viewport.width) + "px";
+    canvas.style.height =  Math.floor(viewport.height) + "px";
+
+    var transform = outputScale !== 1
+      ? [outputScale, 0, 0, outputScale, 0, 0]
+      : null;
+
+    var renderContext = {
+      canvasContext: context,
+      transform: transform,
+      viewport: viewport
+    };
+    page.render(renderContext);
+  }
+
+  function save(target) {
+    document.querySelectorAll('input,textarea')
+      .forEach(b => {
+        // locate the box
+        box = BOXES.filter(orgbox => orgbox.box_id == b.name)[0]
+        box.text = b.value
+      })
+      fetch('/save/{{ filename }}/{{ page }}', {
+        method: 'POST',
+        body: JSON.stringify(BOXES)
+      }).then(function() {
+        url = target.getAttribute('href')
+        if (target.classList.contains('export')) {
+          window.open(url, '_blank')
+        } else {
+          window.location.href = url
+        }
+      })
+  }
+
+  // Add saver to all buttons
+  document.querySelectorAll('a').forEach(node => node.addEventListener('click', function(evt) {
+    evt.preventDefault()
+    save(evt.target)
+  }))
+
+  function addInput(box) {
+    canvas = document.querySelector('canvas')
+    iptype = box.text.includes('\n') ? "textarea" : "input"
+    input = document.createElement(iptype)
+    input.classList.add('form-control')
+    input.classList.add('border')
+    input.classList.add('border-primary')
+    input.classList.add('rounded-0')
+    input.style.top = canvas.offsetTop + SCALE * box.y0 + 'px'
+    input.style.left = canvas.offsetLeft + SCALE * box.x0 + 'px'
+    input.style.height = SCALE * (box.y1 - box.y0) + 'px'
+    input.style.width = SCALE * (box.x1 - box.x0) + 'px'
+    input.value = box.text
+    input.setAttribute('name', box.box_id)
+
+    input.addEventListener('keyup', e => {
+      if (e.key == 'Escape') {
+        e.target.remove()
+      }
+    })
+
+    document.querySelector('.container-fluid').appendChild(input)
+  }
+
+  window.addEventListener('load', function() {
+    pdfjsLib.getDocument('/{{ filename }}').promise.then(pdf => {
+      pdf.getPage({{ page }}).then(renderPage).then(function() {
+        fetch('/ocr/{{ filename }}/{{ page }}')
+        .then((r) => { if (r.ok) { return r.json() }})
+        .then(bxs => {
+          BOXES = bxs
+          svg = document.createElementNS("http://www.w3.org/2000/svg", "svg")
+          BOXES.forEach(drawHighlight)
+          document.querySelector('.container-fluid').appendChild(svg)
+        })
+      }).catch(err => {
+        ctx = document.querySelector("canvas").getContext('2d');
+        ctx.beginPath()
+        ctx.font = "20px Arial";
+        ctx.fillText(err.message, 10, 50);
+        ctx.closePath()
+      })
+    })
+  })
+
+  function drawHighlight(box) {
+    canvas = document.querySelector('canvas')
+    svg.style.top = canvas.offsetTop
+    svg.style.left = canvas.offsetLeft
+    svg.style.height = canvas.style.height
+    svg.style.width = canvas.style.width
+    rect = document.createElementNS("http://www.w3.org/2000/svg", "rect")
+    rect.setAttribute('id', `box_id-${box.box_id}`)
+    rect.setAttribute('x', SCALE * box.x0)
+    rect.setAttribute('y', SCALE * box.y0)
+    rect.setAttribute('height', SCALE * (box.y1 - box.y0))
+    rect.setAttribute('width', SCALE * (box.x1 - box.x0))
+    rect.setAttribute('fill', "rgba(223, 255, 68, 0.3)")
+
+    rect.addEventListener('dblclick', function(evt) {
+      box_id = parseInt(this.getAttribute('id').split('-')[1])
+      box = BOXES.filter(b => b.box_id == box_id)[0]
+      addInput(box)
+    })
+
+    svg.appendChild(rect)
+  }
+</script>
+
+</html>
