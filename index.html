@@ -76,7 +76,7 @@
   }
 
   function save(target) {
-    document.querySelectorAll('input,textarea')
+    document.querySelectorAll('.annotation')
       .forEach(b => {
         // locate the box
         box = BOXES.filter(orgbox => orgbox.box_id == b.name)[0]
@@ -109,6 +109,7 @@
     input.classList.add('border')
     input.classList.add('border-primary')
     input.classList.add('rounded-0')
+    input.classList.add('annotation')
     input.style.top = canvas.offsetTop + SCALE * box.y0 + 'px'
     input.style.left = canvas.offsetLeft + SCALE * box.x0 + 'px'
     input.style.height = SCALE * (box.y1 - box.y0) + 'px'
