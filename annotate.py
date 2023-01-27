@@ -88,3 +88,15 @@ def export(handler):
     handler.set_header('Content-Disposition',
                        f'attachment; filename={filename}_ann.pdf')
     return _export_pdf(filename, df)
+
+
+def upload(handler):
+    filename, page = handler.path_args
+    buff = BytesIO(handler.request.files['upfile'][0]['body'])
+    df = pd.read_csv(buff)
+    df.set_index(['page', 'box_id'], verify_integrity=True, inplace=True)
+    outfile = op.join(ANNDIR, f'{filename}_ann.json')
+    orgdf = pd.read_json(outfile)
+    orgdf.set_index(['page', 'box_id'], verify_integrity=True, inplace=True)
+    orgdf.loc[df.index] = df
+    orgdf.reset_index().to_json(outfile, orient='records', indent=2)

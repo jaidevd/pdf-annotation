@@ -5,6 +5,14 @@ url:
     kwargs:
       path: index.html
       template: true
+  upload:
+    pattern: /$YAMLURL/upload/(.*)/(\d+)
+    handler: FunctionHandler
+    kwargs:
+      function: annotate.upload
+      xsrf_cookies: false
+      redirect:
+        query: next
   export:
     pattern: /$YAMLURL/export/(pdf|csv)
     handler: FunctionHandler
